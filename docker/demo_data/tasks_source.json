@@ -1,0 +1,91 @@
+[
+  {
+    "id": "JJC-20260224-001",
+    "title": "生成本周项目进展周报",
+    "official": "Department of StateSecretary",
+    "org": "Department of State",
+    "state": "Done",
+    "now": "✅ 周报已生成并推送至飞书",
+    "eta": "2026-02-24",
+    "block": "None",
+    "output": "/tmp/weekly-report-20260224.md",
+    "ac": "Done周报需包含各部产出汇总和下周计划",
+    "review_round": 1,
+    "archived": true,
+    "archivedAt": "2026-02-24T16:00:00Z",
+    "flow_log": [
+      {"at": "2026-02-24T09:00:00Z", "from": "President", "to": "National Security Council", "remark": "📜 President issued Executive Order：生成本周项目进展周报"},
+      {"at": "2026-02-24T09:02:30Z", "from": "National Security Council", "to": "White House Counsel", "remark": "📋 National Security Council规划Done · 交付White House Counsel审议"},
+      {"at": "2026-02-24T09:05:00Z", "from": "White House Counsel", "to": "Cabinet Secretariat", "remark": "✅ White House Counsel审议通过 · 移交Cabinet Secretariat派发"},
+      {"at": "2026-02-24T09:06:00Z", "from": "Cabinet Secretariat", "to": "Department of State", "remark": "📮 Cabinet Secretariat派单 → Department of State执行"},
+      {"at": "2026-02-24T09:15:00Z", "from": "Department of State", "to": "Cabinet Secretariat", "remark": "📦 Department of State执行Done · 产出物已提交"},
+      {"at": "2026-02-24T09:16:00Z", "from": "Cabinet Secretariat", "to": "President", "remark": "✅ 回奏：周报任务Done"}
+    ],
+    "updatedAt": "2026-02-24T09:16:00Z"
+  },
+  {
+    "id": "JJC-20260225-001",
+    "title": "Code review for directive repository",
+    "official": "Department of DefenseSecretary",
+    "org": "Department of Defense",
+    "state": "Doing",
+    "now": "🔍 Department of Defense正在审查 dashboard 模块代码",
+    "eta": "2026-02-25",
+    "block": "None",
+    "output": "",
+    "ac": "输出安全漏洞、错误处理、性能问题清单",
+    "review_round": 0,
+    "flow_log": [
+      {"at": "2026-02-25T10:00:00Z", "from": "President", "to": "National Security Council", "remark": "📜 President issued Executive Order：Code review for directive repository"},
+      {"at": "2026-02-25T10:03:00Z", "from": "National Security Council", "to": "White House Counsel", "remark": "📋 National Security Council规划Done"},
+      {"at": "2026-02-25T10:06:00Z", "from": "White House Counsel", "to": "Cabinet Secretariat", "remark": "✅ White House Counsel审议通过"},
+      {"at": "2026-02-25T10:07:00Z", "from": "Cabinet Secretariat", "to": "Department of Defense", "remark": "📮 Cabinet Secretariat派单 → Department of Defense执行"}
+    ],
+    "updatedAt": "2026-02-25T10:30:00Z"
+  },
+  {
+    "id": "JJC-20260225-002",
+    "title": "更新并推送 Docker Hub 镜像",
+    "official": "Department of CommerceSecretary",
+    "org": "Department of Commerce",
+    "state": "Done",
+    "now": "✅ Docker 镜像已推送",
+    "eta": "2026-02-25",
+    "block": "None",
+    "output": "/tmp/docker-push-log.txt",
+    "ac": "更新 Dockerfile, 构建并推送至 DockerHub",
+    "review_round": 0,
+    "flow_log": [
+      {"at": "2026-02-25T14:00:00Z", "from": "President", "to": "National Security Council", "remark": "📜 President issued Executive Order：更新 Docker 镜像"},
+      {"at": "2026-02-25T14:02:00Z", "from": "National Security Council", "to": "White House Counsel", "remark": "📋 规划Done"},
+      {"at": "2026-02-25T14:04:00Z", "from": "White House Counsel", "to": "Cabinet Secretariat", "remark": "✅ 审议通过"},
+      {"at": "2026-02-25T14:05:00Z", "from": "Cabinet Secretariat", "to": "Department of Commerce", "remark": "📮 派单 → Department of Commerce"},
+      {"at": "2026-02-25T14:20:00Z", "from": "Department of Commerce", "to": "Cabinet Secretariat", "remark": "📦 执行Done"},
+      {"at": "2026-02-25T14:21:00Z", "from": "Cabinet Secretariat", "to": "President", "remark": "✅ 回奏Done"}
+    ],
+    "updatedAt": "2026-02-25T14:21:00Z"
+  },
+  {
+    "id": "JJC-20260226-001",
+    "title": "竞品分析：CrewAI vs AutoGen vs U.S. Cabinet Branch",
+    "official": "Department of the TreasurySecretary",
+    "org": "Department of the Treasury",
+    "state": "Review",
+    "now": "📊 分析报告待审查",
+    "eta": "2026-02-26",
+    "block": "None",
+    "output": "/tmp/competitive-analysis.md",
+    "ac": "从架构、审核、可观测性、易用性四个维度对比",
+    "review_round": 2,
+    "flow_log": [
+      {"at": "2026-02-26T08:00:00Z", "from": "President", "to": "National Security Council", "remark": "📜 下旨：分析竞品框架"},
+      {"at": "2026-02-26T08:05:00Z", "from": "National Security Council", "to": "White House Counsel", "remark": "📋 规划Done"},
+      {"at": "2026-02-26T08:08:00Z", "from": "White House Counsel", "to": "National Security Council", "remark": "🔄 White House Counsel封驳：需补充 LangGraph 对比"},
+      {"at": "2026-02-26T08:15:00Z", "from": "National Security Council", "to": "White House Counsel", "remark": "📋 已补充 LangGraph，重新提交"},
+      {"at": "2026-02-26T08:18:00Z", "from": "White House Counsel", "to": "Cabinet Secretariat", "remark": "✅ 第二轮审议通过"},
+      {"at": "2026-02-26T08:20:00Z", "from": "Cabinet Secretariat", "to": "Department of the Treasury", "remark": "📮 派单 → Department of the Treasury"},
+      {"at": "2026-02-26T09:00:00Z", "from": "Department of the Treasury", "to": "Cabinet Secretariat", "remark": "📦 初稿Done，待审查"}
+    ],
+    "updatedAt": "2026-02-26T09:00:00Z"
+  }
+]
