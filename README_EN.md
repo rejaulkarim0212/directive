@@ -1,5 +1,8 @@
 # ⚖️ Executive Order
 
+> **⚠️ INCUBATION NOTICE**
+> This project is currently in final incubation phase. Core architecture is complete and functional, but full integration testing is underway. Expected to be production-ready within 1-2 days. Watch this repo for updates.
+
 **I redesigned AI multi-agent collaboration architecture using the 237-year-old U.S. Constitution.**
 
 **Turns out, the framework hammered out in that un-air-conditioned Philadelphia summer of 1787 handles stress tests better than your YAML config files.**

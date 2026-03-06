@@ -1,5 +1,8 @@
 <h1 align=”center”>⚖️ Executive Order</h1>
 
+> **⚠️ INCUBATION NOTICE**
+> This project is currently in final incubation phase. Core architecture is complete and functional, but full integration testing is underway. Expected to be production-ready within 1-2 days. Watch this repo for updates.
+
 <p align=”center”>
   <strong>我用 237 年前的美国宪法制度，重新设计了 AI 多 Agent 协作架构。<br>结果发现，1787 年费城那个没有空调的夏天，吵出来的架构，比你的 YAML config 文件更经得起压力测试。</strong>
 </p>
