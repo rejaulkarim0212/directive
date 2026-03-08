@@ -1,19 +1,18 @@
 #!/usr/bin/env python3
-"""
-看板任务更新工具 - 供各机构 Agent 调用
+"""看板任务更新工具 - 供各机构 Agent 调用
 
 用法:
-  # 新建任务（收旨时）
-  python3 kanban_update.py create JJC-20260223-012 "任务标题" Zhongshu National Security Council NSC Director
+  # 新建任务（接收 Executive Order 时）
+  python3 kanban_update.py create JJC-20260223-012 "任务标题" planning "National Security Council" "NSC Director"
 
   # 更新状态
-  python3 kanban_update.py state JJC-20260223-012 Menxia "规划方案已提交White House Counsel"
+  python3 kanban_update.py state JJC-20260223-012 under_review "规划方案已提交 Senate 审议"
 
   # 添加流转记录
-  python3 kanban_update.py flow JJC-20260223-012 "National Security Council" "White House Counsel" "规划方案提交审核"
+  python3 kanban_update.py flow JJC-20260223-012 "National Security Council" "United States Senate" "规划方案提交审核"
 
-  # Done任务
-  python3 kanban_update.py done JJC-20260223-012 "/path/to/output" "任务Done摘要"
+  # Completed任务
+  python3 kanban_update.py done JJC-20260223-012 "/path/to/output" "任务完成摘要"
 
   # 添加/更新子任务 todo
   python3 kanban_update.py todo JJC-20260223-012 1 "实现API接口" in-progress
@@ -35,27 +34,43 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(name)s] %(message
 from file_lock import atomic_json_read, atomic_json_update, atomic_json_write  # noqa: E402
 
 STATE_ORG_MAP = {
-    'pending': 'Chief of Staff', 'planning': 'NSC', 'under_review': 'Senate', 'filibustered': 'Senate',
-    'dispatched': 'OMB', 'in_progress': 'Departments', 'pending_review': 'OMB',
+    'pending': 'Chief of Staff Office', 'triage': 'Chief of Staff Office',
+    'planning': 'National Security Council', 'under_review': 'United States Senate', 'filibustered': 'United States Senate',
+    'dispatched': 'Office of Management and Budget', 'in_progress': 'Cabinet Departments', 'pending_review': 'Office of Management and Budget',
     'blocked': 'Supreme Court', 'completed': 'Completed',
+}
+
+STATE_ALIASES = {
+    'Pending': 'pending',
+    'Taizi': 'triage',
+    'Zhongshu': 'planning',
+    'Menxia': 'under_review',
+    'Omb': 'dispatched',
+    'Assigned': 'dispatched',
+    'Doing': 'in_progress',
+    'Review': 'pending_review',
+    'Done': 'completed',
+    'Blocked': 'blocked',
 }
 
 _STATE_AGENT_MAP = {
     'pending': 'chief_of_staff',
+    'triage': 'chief_of_staff',
     'planning': 'nsc',
     'under_review': 'senate',
     'filibustered': 'nsc',
     'dispatched': 'omb',
-    'in_progress': 'omb',
+    'in_progress': None,
     'pending_review': 'omb',
     'blocked': 'supreme_court',
-    'completed': 'omb',
+    'completed': 'chief_of_staff',
 }
 
 _ORG_AGENT_MAP = {
     'Department of State': 'state_dept', 'Department of the Treasury': 'treasury', 'Department of Defense': 'dod',
     'Department of Justice': 'doj', 'Department of Commerce': 'commerce',
-    'NSC': 'nsc', 'Senate': 'senate', 'OMB': 'omb', 'Supreme Court': 'supreme_court',
+    'National Security Council': 'nsc', 'United States Senate': 'senate',
+    'Office of Management and Budget': 'omb', 'Supreme Court': 'supreme_court',
 }
 
 _AGENT_LABELS = {
@@ -72,7 +87,7 @@ def load():
 
 def save(tasks):
     atomic_json_write(TASKS_FILE, tasks)
-    # 异步触发刷新，不Blocked调用方
+    # 异步触发刷新，不阻塞调用方
     try:
         subprocess.Popen(['python3', str(REFRESH_SCRIPT)],
                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -81,6 +96,12 @@ def save(tasks):
 
 def now_iso():
     return datetime.datetime.now(datetime.timezone.utc).isoformat().replace('+00:00', 'Z')
+
+
+def normalize_state(state):
+    if isinstance(state, str):
+        return STATE_ALIASES.get(state, state)
+    return state
 
 def find_task(tasks, task_id):
     return next((t for t in tasks if t.get('id') == task_id), None)
@@ -145,10 +166,10 @@ def _infer_agent_id_from_runtime(task=None):
         return m2.group(1)
 
     if task:
-        state = task.get('state', '')
+        state = normalize_state(task.get('state', ''))
         org = task.get('org', '')
         aid = _STATE_AGENT_MAP.get(state)
-        if aid is None and state in ('Doing', 'Next'):
+        if aid is None and state == 'in_progress':
             aid = _ORG_AGENT_MAP.get(org)
         if aid:
             return aid
@@ -175,7 +196,8 @@ def _is_valid_task_title(title):
 
 
 def cmd_create(task_id, title, state, org, official, remark=None):
-    """新建任务（收旨时立即调用）"""
+    """新建任务（接收 Executive Order 时立即调用）"""
+    state = normalize_state(state)
     # 清洗标题（剥离元数据）
     title = _sanitize_title(title)
     # Directive标题校验
@@ -189,10 +211,10 @@ def cmd_create(task_id, title, state, org, official, remark=None):
     def modifier(tasks):
         existing = next((t for t in tasks if t.get('id') == task_id), None)
         if existing:
-            if existing.get('state') in ('Done', 'Cancelled'):
+            if normalize_state(existing.get('state')) in ('completed', 'Cancelled'):
                 log.warning(f'⚠️ 任务 {task_id} 已完结 (state={existing["state"]})，不可覆盖')
                 return tasks
-            if existing.get('state') not in (None, '', 'Inbox', 'Pending'):
+            if normalize_state(existing.get('state')) not in (None, '', 'pending'):
                 log.warning(f'任务 {task_id} 已存在 (state={existing["state"]})，将被覆盖')
         tasks = [t for t in tasks if t.get('id') != task_id]
         tasks.insert(0, {
@@ -211,13 +233,14 @@ def cmd_create(task_id, title, state, org, official, remark=None):
 
 def cmd_state(task_id, new_state, now_text=None):
     """更新任务状态（原子操作）"""
+    new_state = normalize_state(new_state)
     old_state = [None]
     def modifier(tasks):
         t = find_task(tasks, task_id)
         if not t:
             log.error(f'任务 {task_id} 不存在')
             return tasks
-        old_state[0] = t['state']
+        old_state[0] = normalize_state(t.get('state'))
         t['state'] = new_state
         if new_state in STATE_ORG_MAP:
             t['org'] = STATE_ORG_MAP[new_state]
@@ -249,40 +272,40 @@ def cmd_flow(task_id, from_dept, to_dept, remark):
 
 
 def cmd_done(task_id, output_path='', summary=''):
-    """标记任务Done（原子操作）"""
+    """标记任务 completed（原子操作）"""
     def modifier(tasks):
         t = find_task(tasks, task_id)
         if not t:
             log.error(f'任务 {task_id} 不存在')
             return tasks
-        t['state'] = 'Done'
+        t['state'] = 'completed'
         t['output'] = output_path
-        t['now'] = summary or '任务已Done'
+        t['now'] = summary or '任务已完成'
         t.setdefault('flow_log', []).append({
             "at": now_iso(), "from": t.get('org', '执行部门'),
-            "to": "President", "remark": f"✅ Done：{summary or '任务已Done'}"
+            "to": "President", "remark": f"✅ Completed：{summary or '任务已完成'}"
         })
         t['updatedAt'] = now_iso()
         return tasks
     atomic_json_update(TASKS_FILE, modifier, [])
     save(load())  # trigger refresh
-    log.info(f'✅ {task_id} 已Done')
+    log.info(f'✅ {task_id} 已完成')
 
 
 def cmd_block(task_id, reason):
-    """标记Blocked（原子操作）"""
+    """标记 blocked（原子操作）"""
     def modifier(tasks):
         t = find_task(tasks, task_id)
         if not t:
             log.error(f'任务 {task_id} 不存在')
             return tasks
-        t['state'] = 'Blocked'
+        t['state'] = 'blocked'
         t['block'] = reason
         t['updatedAt'] = now_iso()
         return tasks
     atomic_json_update(TASKS_FILE, modifier, [])
     save(load())  # trigger refresh
-    log.warning(f'⚠️ {task_id} 已Blocked: {reason}')
+    log.warning(f'⚠️ {task_id} 已 blocked: {reason}')
 
 
 def cmd_progress(task_id, now_text, todos_pipe='', tokens=0, cost=0.0, elapsed=0):
@@ -290,7 +313,7 @@ def cmd_progress(task_id, now_text, todos_pipe='', tokens=0, cost=0.0, elapsed=0
 
     now_text: 当前正在做什么的一句话描述（必填）
     todos_pipe: 可选，用 | 分隔的 todo 列表，格式：
-        "已Done的事项✅|正在做的事项🔄|计划做的事项"
+        "已完成的事项✅|正在做的事项🔄|计划做的事项"
         - 以 ✅ 结尾 → completed
         - 以 🔄 结尾 → in-progress
         - 其他 → not-started

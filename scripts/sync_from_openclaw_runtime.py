@@ -32,31 +32,34 @@ def ms_to_str(ts_ms):
 
 def state_from_session(age_ms, aborted):
     if aborted:
-        return 'Blocked'
+        return 'blocked'
     if age_ms <= 2 * 60 * 1000:
-        return 'Doing'
+        return 'in_progress'
     if age_ms <= 60 * 60 * 1000:
-        return 'Review'
-    return 'Next'
+        return 'pending_review'
+    return 'dispatched'
 
 
 def detect_official(agent_id):
     mapping = {
-        'main':    ('Chief of Staff', 'Chief of Staff Office'),        # legacy id for chief_of_staff
-        'chief_of_staff':   ('Chief of Staff', 'Chief of Staff Office'),
+        'main': ('Chief of Staff', 'Chief of Staff Office'),
+        'chief_of_staff': ('Chief of Staff', 'Chief of Staff Office'),
         'nsc': ('NSC Director', 'National Security Council'),
-        'wh_counsel':  ('White House Counsel', 'White House Counsel'),
+        'senate': ('Senate Reviewer', 'United States Senate'),
+        'wh_counsel': ('Senate Reviewer', 'United States Senate'),
         'omb': ('OMB Director', 'Office of Management and Budget'),
-        'cabinet_sec': ('Cabinet Secretary', 'Cabinet Secretariat'),
-        'treasury':    ('Secretary of the Treasury', 'Department of the Treasury'),
-        'state':    ('Secretary of State', 'Department of State'),
-        'defense':  ('Secretary of Defense', 'Department of Defense'),
-        'justice':  ('Attorney General', 'Department of Justice'),
-        'commerce':  ('Secretary of Commerce', 'Department of Commerce'),
-        'opm': ('Director of OPM', 'Office of Personnel Management'),
-        'press_sec': ('Press Secretary', 'Press Office'),
+        'cabinet_sec': ('OMB Director', 'Office of Management and Budget'),
+        'treasury': ('Secretary of the Treasury', 'Department of the Treasury'),
+        'state': ('Secretary of State', 'Department of State'),
+        'state_dept': ('Secretary of State', 'Department of State'),
+        'defense': ('Secretary of Defense', 'Department of Defense'),
+        'dod': ('Secretary of Defense', 'Department of Defense'),
+        'justice': ('Attorney General', 'Department of Justice'),
+        'doj': ('Attorney General', 'Department of Justice'),
+        'commerce': ('Secretary of Commerce', 'Department of Commerce'),
+        'supreme_court': ('Chief Justice', 'Supreme Court'),
     }
-    return mapping.get(agent_id, ('Cabinet Secretary', 'Cabinet Secretariat'))
+    return mapping.get(agent_id, ('OMB Director', 'Office of Management and Budget'))
 
 
 def load_activity(session_file, limit=12):
@@ -247,7 +250,7 @@ def main():
             except Exception:
                 pass
 
-        # merge manual parallel tasks (用于军机处并行看板展示)
+        # merge manual parallel tasks (用于 Cabinet Departments 并行看板展示)
         manual_tasks_file = DATA / 'manual_parallel_tasks.json'
         if manual_tasks_file.exists():
             try:
@@ -289,16 +292,16 @@ def main():
             # 2. 排除纯后台 cron / subagent 任务，除非它们正在报错
             if '定时任务' in title or '子任务' in title:
                 # 只有当它 block 或者 error 时才显示，否则视为噪音
-                if t.get('state') != 'Blocked':
+                if t.get('state') != 'blocked':
                     continue
 
             # 3. 排除非活跃的 OC 会话 (超过 5 分钟None响应)，避免污染看板
-            # 除非它是 Blocked (报错)，或者是今天新建的
+            # 除非它是 blocked (报错)
             state = t.get('state')
-            # state_from_session: < 2min = Doing, < 60min = Review, else = Next
-            if state not in ('Doing', 'Blocked'):
+            # state_from_session: < 2min = in_progress, < 60min = pending_review, else = dispatched
+            if state not in ('in_progress', 'blocked'):
                 # 如果不是正在进行或报错，就隐藏掉
-                # 特例: 如果是 mission control (mc-) 的心跳，可能也没必要显示，除非 Doing
+                # 特例: 如果是 mission control (mc-) 的心跳，默认仍隐藏
                 continue
 
             filtered_tasks.append(t)
