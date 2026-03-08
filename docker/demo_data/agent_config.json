@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-02-24 22:13:06",
+  "generatedAt": "2026-03-06 23:45:00",
   "defaultModel": "anthropic/claude-sonnet-4-6",
   "knownModels": [
     {
@@ -13,18 +13,8 @@
       "provider": "Anthropic"
     },
     {
-      "id": "anthropic/claude-haiku-3-5",
-      "label": "Claude Haiku 3.5",
-      "provider": "Anthropic"
-    },
-    {
       "id": "openai/gpt-4o",
       "label": "GPT-4o",
-      "provider": "OpenAI"
-    },
-    {
-      "id": "openai/gpt-4o-mini",
-      "label": "GPT-4o Mini",
       "provider": "OpenAI"
     },
     {
@@ -33,241 +23,171 @@
       "provider": "OpenAI Codex"
     },
     {
-      "id": "google/gemini-2.0-flash",
-      "label": "Gemini 2.0 Flash",
-      "provider": "Google"
-    },
-    {
       "id": "google/gemini-2.5-pro",
       "label": "Gemini 2.5 Pro",
       "provider": "Google"
-    },
-    {
-      "id": "copilot/claude-sonnet-4",
-      "label": "Claude Sonnet 4",
-      "provider": "Copilot"
-    },
-    {
-      "id": "github-copilot/claude-opus-4.6",
-      "label": "Claude Opus 4.6",
-      "provider": "GitHub Copilot"
-    },
-    {
-      "id": "copilot/claude-opus-4.5",
-      "label": "Claude Opus 4.5",
-      "provider": "Copilot"
-    },
-    {
-      "id": "copilot/gpt-4o",
-      "label": "GPT-4o",
-      "provider": "Copilot"
-    },
-    {
-      "id": "copilot/gemini-2.5-pro",
-      "label": "Gemini 2.5 Pro",
-      "provider": "Copilot"
-    },
-    {
-      "id": "copilot/o3-mini",
-      "label": "o3-mini",
-      "provider": "Copilot"
     }
   ],
   "agents": [
     {
-      "id": "cabinet_sec",
-      "label": "Cabinet Secretariat",
-      "role": "Cabinet Secretary",
-      "duty": "派单与升级裁决",
-      "emoji": "📮",
+      "id": "chief_of_staff",
+      "label": "Chief of Staff Office",
+      "role": "Chief of Staff",
+      "duty": "Triage all incoming directives and route valid tasks to NSC",
+      "emoji": "👔",
       "model": "anthropic/claude-sonnet-4-6",
       "defaultModel": "anthropic/claude-sonnet-4-6",
       "isDefaultModel": true,
-      "workspace": "/Users/bingsen/.openclaw/workspace-cabinet_sec",
-      "skills": [
-        {
-          "name": "dispatch",
-          "path": "/Users/bingsen/.openclaw/workspace-cabinet_sec/skills/dispatch/SKILL.md",
-          "exists": true,
-          "description": "---"
-        },
-        {
-          "name": "kanban-local",
-          "path": "/Users/bingsen/.openclaw/workspace-cabinet_sec/skills/kanban-local/SKILL.md",
-          "exists": true,
-          "description": "---"
-        },
-        {
-          "name": "organization-governance",
-          "path": "/Users/bingsen/.openclaw/workspace-cabinet_sec/skills/organization-governance/SKILL.md",
-          "exists": true,
-          "description": "---"
-        }
-      ],
+      "workspace": "/Users/sanbu/.openclaw/workspace-chief_of_staff",
+      "skills": [],
       "allowAgents": [
-        "nsc",
-        "wh_counsel",
-        "treasury",
-        "state",
-        "defense",
-        "justice",
-        "commerce"
+        "nsc"
       ]
     },
     {
       "id": "nsc",
       "label": "National Security Council",
       "role": "NSC Director",
-      "duty": "起草任务令与优先级",
-      "emoji": "📜",
+      "duty": "Strategic planning, decomposition and assignment design",
+      "emoji": "📋",
       "model": "anthropic/claude-sonnet-4-6",
       "defaultModel": "anthropic/claude-sonnet-4-6",
       "isDefaultModel": true,
-      "workspace": "/Users/bingsen/.openclaw/workspace-nsc",
-      "skills": [
-        {
-          "name": "planning",
-          "path": "/Users/bingsen/.openclaw/workspace-nsc/skills/planning/SKILL.md",
-          "exists": true,
-          "description": "---"
-        }
-      ],
+      "workspace": "/Users/sanbu/.openclaw/workspace-nsc",
+      "skills": [],
       "allowAgents": [
-        "wh_counsel",
-        "cabinet_sec"
+        "senate"
       ]
     },
     {
-      "id": "wh_counsel",
-      "label": "White House Counsel",
-      "role": "White House Counsel",
-      "duty": "审议与退回机制",
-      "emoji": "🔍",
+      "id": "senate",
+      "label": "United States Senate",
+      "role": "Senate Reviewer",
+      "duty": "Review NSC plans, approve or filibuster with required changes",
+      "emoji": "🏛️",
       "model": "anthropic/claude-sonnet-4-6",
       "defaultModel": "anthropic/claude-sonnet-4-6",
       "isDefaultModel": true,
-      "workspace": "/Users/bingsen/.openclaw/workspace-wh_counsel",
-      "skills": [
-        {
-          "name": "review",
-          "path": "/Users/bingsen/.openclaw/workspace-wh_counsel/skills/review/SKILL.md",
-          "exists": true,
-          "description": "---"
-        }
-      ],
+      "workspace": "/Users/sanbu/.openclaw/workspace-senate",
+      "skills": [],
       "allowAgents": [
-        "cabinet_sec",
-        "nsc"
+        "nsc",
+        "omb"
+      ]
+    },
+    {
+      "id": "omb",
+      "label": "Office of Management and Budget",
+      "role": "OMB Director",
+      "duty": "Dispatch approved plans, coordinate departments, consolidate outputs",
+      "emoji": "💼",
+      "model": "anthropic/claude-sonnet-4-6",
+      "defaultModel": "anthropic/claude-sonnet-4-6",
+      "isDefaultModel": true,
+      "workspace": "/Users/sanbu/.openclaw/workspace-omb",
+      "skills": [],
+      "allowAgents": [
+        "treasury",
+        "state_dept",
+        "dod",
+        "doj",
+        "commerce",
+        "supreme_court"
       ]
     },
     {
       "id": "treasury",
       "label": "Department of the Treasury",
-      "role": "Department of the TreasurySecretary",
-      "duty": "资源/预算/成本",
-      "emoji": "💰",
+      "role": "Treasury Secretary",
+      "duty": "Data analysis, budget modeling and cost accounting",
+      "emoji": "🏦",
       "model": "anthropic/claude-sonnet-4-6",
       "defaultModel": "anthropic/claude-sonnet-4-6",
       "isDefaultModel": true,
-      "workspace": "/Users/bingsen/.openclaw/workspace-treasury",
-      "skills": [
-        {
-          "name": "data-analysis",
-          "path": "/Users/bingsen/.openclaw/workspace-treasury/skills/data-analysis/SKILL.md",
-          "exists": true,
-          "description": "---"
-        }
-      ],
+      "workspace": "/Users/sanbu/.openclaw/workspace-treasury",
+      "skills": [],
       "allowAgents": [
-        "cabinet_sec"
+        "omb",
+        "supreme_court"
       ]
     },
     {
-      "id": "state",
+      "id": "state_dept",
       "label": "Department of State",
-      "role": "Department of StateSecretary",
-      "duty": "文档/汇报/规范",
-      "emoji": "📝",
+      "role": "Secretary of State",
+      "duty": "Documentation, communication and specification delivery",
+      "emoji": "🌐",
       "model": "anthropic/claude-sonnet-4-6",
       "defaultModel": "anthropic/claude-sonnet-4-6",
       "isDefaultModel": true,
-      "workspace": "/Users/bingsen/.openclaw/workspace-state",
-      "skills": [
-        {
-          "name": "doc-writer",
-          "path": "/Users/bingsen/.openclaw/workspace-state/skills/doc-writer/SKILL.md",
-          "exists": true,
-          "description": "---"
-        }
-      ],
+      "workspace": "/Users/sanbu/.openclaw/workspace-state_dept",
+      "skills": [],
       "allowAgents": [
-        "cabinet_sec"
+        "omb",
+        "supreme_court"
       ]
     },
     {
-      "id": "defense",
+      "id": "dod",
       "label": "Department of Defense",
-      "role": "Department of DefenseSecretary",
-      "duty": "应急与巡检",
-      "emoji": "⚔️",
+      "role": "Secretary of Defense",
+      "duty": "Engineering implementation and code delivery",
+      "emoji": "🛡️",
       "model": "anthropic/claude-sonnet-4-6",
       "defaultModel": "anthropic/claude-sonnet-4-6",
       "isDefaultModel": true,
-      "workspace": "/Users/bingsen/.openclaw/workspace-defense",
-      "skills": [
-        {
-          "name": "coding",
-          "path": "/Users/bingsen/.openclaw/workspace-defense/skills/coding/SKILL.md",
-          "exists": true,
-          "description": "---"
-        }
-      ],
+      "workspace": "/Users/sanbu/.openclaw/workspace-dod",
+      "skills": [],
       "allowAgents": [
-        "cabinet_sec"
+        "omb",
+        "supreme_court"
       ]
     },
     {
-      "id": "justice",
+      "id": "doj",
       "label": "Department of Justice",
-      "role": "Department of JusticeSecretary",
-      "duty": "合规/审计/红线",
+      "role": "Attorney General",
+      "duty": "Security review, compliance checks and governance",
       "emoji": "⚖️",
       "model": "anthropic/claude-sonnet-4-6",
       "defaultModel": "anthropic/claude-sonnet-4-6",
       "isDefaultModel": true,
-      "workspace": "/Users/bingsen/.openclaw/workspace-justice",
-      "skills": [
-        {
-          "name": "security-review",
-          "path": "/Users/bingsen/.openclaw/workspace-justice/skills/security-review/SKILL.md",
-          "exists": true,
-          "description": "---"
-        }
-      ],
+      "workspace": "/Users/sanbu/.openclaw/workspace-doj",
+      "skills": [],
       "allowAgents": [
-        "cabinet_sec"
+        "omb",
+        "supreme_court"
       ]
     },
     {
       "id": "commerce",
       "label": "Department of Commerce",
-      "role": "Department of CommerceSecretary",
-      "duty": "工程交付与自动化",
+      "role": "Secretary of Commerce",
+      "duty": "Infrastructure, CI/CD, deployment and operations automation",
       "emoji": "🔧",
       "model": "anthropic/claude-sonnet-4-6",
       "defaultModel": "anthropic/claude-sonnet-4-6",
       "isDefaultModel": true,
-      "workspace": "/Users/bingsen/.openclaw/workspace-commerce",
-      "skills": [
-        {
-          "name": "ops",
-          "path": "/Users/bingsen/.openclaw/workspace-commerce/skills/ops/SKILL.md",
-          "exists": true,
-          "description": "---"
-        }
-      ],
+      "workspace": "/Users/sanbu/.openclaw/workspace-commerce",
+      "skills": [],
       "allowAgents": [
-        "cabinet_sec"
+        "omb",
+        "supreme_court"
+      ]
+    },
+    {
+      "id": "supreme_court",
+      "label": "Supreme Court",
+      "role": "Chief Justice",
+      "duty": "Judicial review and final arbitration of inter-agent disputes",
+      "emoji": "🧑‍⚖️",
+      "model": "anthropic/claude-sonnet-4-6",
+      "defaultModel": "anthropic/claude-sonnet-4-6",
+      "isDefaultModel": true,
+      "workspace": "/Users/sanbu/.openclaw/workspace-supreme_court",
+      "skills": [],
+      "allowAgents": [
+        "omb"
       ]
     }
   ]

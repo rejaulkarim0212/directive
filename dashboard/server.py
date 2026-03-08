@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-U.S. Cabinet Branch · 看板本地 API 服务器
+Executive Order · 看板本地 API 服务器
 Port: 7891 (可通过 --port 修改)
 
 Endpoints:
@@ -82,8 +82,56 @@ def now_iso():
     return datetime.datetime.now(datetime.timezone.utc).isoformat().replace('+00:00', 'Z')
 
 
+_LEGACY_STATE_MAP = {
+    'Pending': 'pending',
+    'Taizi': 'triage',
+    'Zhongshu': 'planning',
+    'Menxia': 'under_review',
+    'Omb': 'dispatched',
+    'Assigned': 'dispatched',
+    'Doing': 'in_progress',
+    'Review': 'pending_review',
+    'Next': 'in_progress',
+    'Done': 'completed',
+    'Blocked': 'blocked',
+}
+_LEGACY_ORG_MAP = {
+    'White House Counsel': 'United States Senate',
+    'Cabinet Secretariat': 'Office of Management and Budget',
+    'State Department': 'Department of State',
+}
+
+
+def _normalize_state(value):
+    if isinstance(value, str):
+        return _LEGACY_STATE_MAP.get(value, value)
+    return value
+
+
+def _normalize_org(value):
+    if isinstance(value, str):
+        return _LEGACY_ORG_MAP.get(value, value)
+    return value
+
+
+def _normalize_task(task):
+    if not isinstance(task, dict):
+        return task
+    out = dict(task)
+    out['state'] = _normalize_state(out.get('state', ''))
+    if '_prev_state' in out:
+        out['_prev_state'] = _normalize_state(out.get('_prev_state'))
+    out['org'] = _normalize_org(out.get('org', ''))
+    if out.get('block') in ('无', 'NoneType'):
+        out['block'] = 'None'
+    return out
+
+
 def load_tasks():
-    return atomic_json_read(DATA / 'tasks_source.json', [])
+    tasks = atomic_json_read(DATA / 'tasks_source.json', [])
+    if not isinstance(tasks, list):
+        return []
+    return [_normalize_task(t) for t in tasks]
 
 
 def save_tasks(tasks):
@@ -109,7 +157,7 @@ def handle_task_action(task_id, action, reason):
     _scheduler_snapshot(task, f'task-action-before-{action}')
 
     if action == 'stop':
-        task['state'] = 'Blocked'
+        task['state'] = 'blocked'
         task['block'] = reason or 'President叫停'
         task['now'] = f'⏸️ 已暂停：{reason}'
     elif action == 'cancel':
@@ -117,8 +165,8 @@ def handle_task_action(task_id, action, reason):
         task['block'] = reason or 'President取消'
         task['now'] = f'🚫 已取消：{reason}'
     elif action == 'resume':
-        # Resume to previous active state or Doing
-        task['state'] = task.get('_prev_state', 'Doing')
+        # Resume to previous active state or in_progress
+        task['state'] = _normalize_state(task.get('_prev_state', 'in_progress'))
         task['block'] = 'None'
         task['now'] = f'▶️ 已恢复执行'
 
@@ -133,7 +181,7 @@ def handle_task_action(task_id, action, reason):
     })
 
     if action == 'resume':
-        _scheduler_mark_progress(task, f'恢复到 {task.get("state", "Doing")}')
+        _scheduler_mark_progress(task, f'恢复到 {task.get("state", "in_progress")}')
     else:
         _scheduler_add_flow(task, f'President{action}：{reason or "None"}')
 
@@ -147,12 +195,12 @@ def handle_task_action(task_id, action, reason):
 
 
 def handle_archive_task(task_id, archived, archive_all_done=False):
-    """Archive or unarchive a task, or batch-archive all Done/Cancelled tasks."""
+    """Archive or unarchive a task, or batch-archive completed/cancelled tasks."""
     tasks = load_tasks()
     if archive_all_done:
         count = 0
         for t in tasks:
-            if t.get('state') in ('Done', 'Cancelled') and not t.get('archived'):
+            if t.get('state') in _TERMINAL_STATES and not t.get('archived'):
                 t['archived'] = True
                 t['archivedAt'] = now_iso()
                 count += 1
@@ -276,7 +324,7 @@ def add_remote_skill(agent_id, skill_name, source_url, description=''):
         if source_url.startswith('http://') or source_url.startswith('https://'):
             # HTTPS URL 校验
             if not validate_url(source_url, allowed_schemes=('https',)):
-                return {'ok': False, 'error': 'URL None效或不安全（仅支持 HTTPS）'}
+                return {'ok': False, 'error': 'URL 无效或不安全（仅支持 HTTPS）'}
             
             # 从 URL 下载，带超时保护
             req = Request(source_url, headers={'User-Agent': 'OpenClaw-SkillManager/1.0'})
@@ -286,7 +334,7 @@ def add_remote_skill(agent_id, skill_name, source_url, description=''):
                 if len(content) > 10 * 1024 * 1024:
                     return {'ok': False, 'error': '文件过大（最大 10MB）'}
             except Exception as e:
-                return {'ok': False, 'error': f'URL None法访问: {str(e)[:100]}'}
+                return {'ok': False, 'error': f'URL 无法访问: {str(e)[:100]}'}
         
         elif source_url.startswith('file://'):
             # file:// URL 格式
@@ -313,20 +361,20 @@ def add_remote_skill(agent_id, skill_name, source_url, description=''):
     
     # 基础验证：检查是否为 Markdown 且包含 YAML frontmatter
     if not content.startswith('---'):
-        return {'ok': False, 'error': '文件格式None效（缺少 YAML frontmatter）'}
+        return {'ok': False, 'error': '文件格式无效（缺少 YAML frontmatter）'}
     
     # 尝试解析 frontmatter
     try:
         import yaml
         parts = content.split('---', 2)
         if len(parts) < 3:
-            return {'ok': False, 'error': '文件格式None效（YAML frontmatter 结构错误）'}
+            return {'ok': False, 'error': '文件格式无效（YAML frontmatter 结构错误）'}
         frontmatter_str = parts[1]
         yaml.safe_load(frontmatter_str)  # 验证 YAML 格式
     except Exception as e:
         # 不要求完全的 YAML 解析，但要检查基本结构
         if 'name:' not in content[:500]:
-            return {'ok': False, 'error': f'文件格式None效: {str(e)[:100]}'}
+            return {'ok': False, 'error': f'文件格式无效: {str(e)[:100]}'}
     
     # 创建本地目录
     workspace = OCLAW_HOME / f'workspace-{agent_id}' / 'skills' / skill_name
@@ -460,7 +508,7 @@ def remove_remote_skill(agent_id, skill_name):
     # 检查是否为远程 skill
     source_json = workspace / '.source.json'
     if not source_json.exists():
-        return {'ok': False, 'error': f'技能 {skill_name} 不是远程 skill，None法通过此 API 移除'}
+        return {'ok': False, 'error': f'技能 {skill_name} 不是远程 skill，无法通过此 API 移除'}
     
     try:
         # 删除整个 skill 目录
@@ -559,14 +607,14 @@ def handle_create_task(title, org='National Security Council', official='NSC Dir
         seq = max(nums) + 1 if nums else 1
     task_id = f'JJC-{today}-{seq:03d}'
     # 正确流程起点：President -> Chief of Staff Office分拣
-    # target_dept 记录模板建议的最终执行部门（仅供Cabinet Secretariat派发参考）
+    # target_dept 记录模板建议的最终执行部门（仅供 OMB 派发参考）
     initial_org = 'Chief of Staff Office'
     new_task = {
         'id': task_id,
         'title': title,
         'official': official,
         'org': initial_org,
-        'state': 'Taizi',
+        'state': 'triage',
         'now': '等待Chief of Staff Office接旨分拣',
         'eta': '-',
         'block': 'None',
@@ -594,61 +642,55 @@ def handle_create_task(title, org='National Security Council', official='NSC Dir
     save_tasks(tasks)
     log.info(f'创建任务: {task_id} | {title[:40]}')
 
-    dispatch_for_state(task_id, new_task, 'pending', trigger='executive-order')
+    dispatch_for_state(task_id, new_task, new_task.get('state', 'triage'), trigger='executive-order')
 
     return {'ok': True, 'taskId': task_id, 'message': f'Directive {task_id} 已下达，正在派发给 Chief of Staff'}
 
 
 def handle_review_action(task_id, action, comment=''):
-    """审议动作处理：White House Counsel / OMB / 最终Review。"""
+    """审议动作处理：Senate 审议或 OMB 汇总审议。"""
     tasks = load_tasks()
     task = next((t for t in tasks if t.get('id') == task_id), None)
     if not task:
         return {'ok': False, 'error': f'任务 {task_id} 不存在'}
-    if task.get('state') not in ('Review', 'Menxia', 'Omb'):
-        return {'ok': False, 'error': f'任务 {task_id} 当前状态为 {task.get("state")}，None法御批'}
+    if task.get('state') not in ('under_review', 'pending_review'):
+        return {'ok': False, 'error': f'任务 {task_id} 当前状态为 {task.get("state")}，无法御批'}
 
     _ensure_scheduler(task)
     _scheduler_snapshot(task, f'review-before-{action}')
 
     if action == 'approve':
-        if task['state'] == 'Menxia':
-            task['state'] = 'Omb'
-            task['now'] = 'White House Counsel审议通过，移交 OMB 二次审议'
-            remark = f'✅ 法律审议通过：{comment or "转 OMB 做预算与资源审议"}'
+        if task['state'] == 'under_review':
+            task['state'] = 'dispatched'
+            task['now'] = 'Senate 审议通过，进入 OMB 派发阶段'
+            remark = f'✅ Senate 审议通过：{comment or "转 OMB 派发执行"}'
             to_dept = 'Office of Management and Budget'
-            from_dept = 'White House Counsel'
-        elif task['state'] == 'Omb':
-            task['state'] = 'Assigned'
-            task['now'] = 'OMB 审议通过，移交Cabinet Secretariat派发'
-            remark = f'✅ OMB 审议通过：{comment or "预算与资源可行"}'
-            to_dept = 'Cabinet Secretariat'
-            from_dept = 'Office of Management and Budget'
-        else:  # Review
-            task['state'] = 'Done'
-            task['now'] = '最终审查通过，任务Done'
-            remark = f'✅ Final review approved: {comment or "审查通过"}'
+            from_dept = 'United States Senate'
+        else:  # pending_review
+            task['state'] = 'completed'
+            task['now'] = 'OMB 汇总审议通过，任务完成'
+            remark = f'✅ OMB 汇总审议通过：{comment or "提交总统简报"}'
             to_dept = 'President'
-            from_dept = 'Cabinet Secretariat'
+            from_dept = 'Office of Management and Budget'
     elif action == 'reject':
         prev_state = task.get('state')
         round_num = (task.get('review_round') or 0) + 1
         task['review_round'] = round_num
-        task['state'] = 'Zhongshu'
-        task['now'] = f'审议驳回，退回National Security Council修订（第{round_num}轮）'
-        if prev_state == 'Omb':
-            remark = f'🚫 OMB 驳回：{comment or "预算或资源不可行"}'
+        task['state'] = 'planning'
+        task['now'] = f'审议驳回，退回 National Security Council 修订（第{round_num}轮）'
+        if prev_state == 'pending_review':
+            remark = f'🚫 OMB 驳回：{comment or "汇总结果不可执行"}'
             from_dept = 'Office of Management and Budget'
         else:
-            remark = f'🚫 审议驳回：{comment or "需要修改"}'
-            from_dept = 'White House Counsel'
+            remark = f'🚫 Senate 封否：{comment or "需要修改"}'
+            from_dept = 'United States Senate'
         to_dept = 'National Security Council'
     else:
         return {'ok': False, 'error': f'未知操作: {action}'}
 
     task.setdefault('flow_log', []).append({
         'at': now_iso(),
-        'from': from_dept if task.get('state') != 'Done' else 'President',
+        'from': from_dept if task.get('state') != 'completed' else 'President',
         'to': to_dept,
         'remark': remark
     })
@@ -658,29 +700,27 @@ def handle_review_action(task_id, action, comment=''):
 
     # 🚀 审批后自动派发对应 Agent
     new_state = task['state']
-    if new_state not in ('Done',):
+    if new_state not in _TERMINAL_STATES:
         dispatch_for_state(task_id, task, new_state)
 
     label = '已准奏' if action == 'approve' else '已封驳'
-    dispatched = ' (已自动派发 Agent)' if new_state != 'Done' else ''
+    dispatched = ' (已自动派发 Agent)' if new_state not in _TERMINAL_STATES else ''
     return {'ok': True, 'message': f'{task_id} {label}{dispatched}'}
 
 
 # ══ Agent 在线状态检测 ══
 
 _AGENT_DEPTS = [
-    {'id':'chief_of_staff', 'label':'Chief of Staff Office', 'emoji':'🤴', 'role':'Chief of Staff', 'rank':'EOP'},
-    {'id':'nsc', 'label':'National Security Council', 'emoji':'📜', 'role':'NSC Director', 'rank':'EOP'},
-    {'id':'wh_counsel', 'label':'White House Counsel', 'emoji':'🔍', 'role':'White House Counsel', 'rank':'EOP'},
-    {'id':'omb', 'label':'Office of Management and Budget', 'emoji':'📊', 'role':'OMB Director', 'rank':'EOP'},
-    {'id':'cabinet_sec', 'label':'Cabinet Secretariat', 'emoji':'📮', 'role':'Cabinet Secretary', 'rank':'EOP'},
-    {'id':'treasury', 'label':'Department of the Treasury', 'emoji':'💰', 'role':'Secretary of the Treasury', 'rank':'Cabinet'},
-    {'id':'state', 'label':'Department of State', 'emoji':'📝', 'role':'Secretary of State', 'rank':'Cabinet'},
-    {'id':'defense', 'label':'Department of Defense', 'emoji':'⚔️', 'role':'Secretary of Defense', 'rank':'Cabinet'},
-    {'id':'justice', 'label':'Department of Justice', 'emoji':'⚖️', 'role':'Attorney General', 'rank':'Cabinet'},
+    {'id':'chief_of_staff', 'label':'Chief of Staff Office', 'emoji':'👔', 'role':'Chief of Staff', 'rank':'EOP'},
+    {'id':'nsc', 'label':'National Security Council', 'emoji':'📋', 'role':'NSC Director', 'rank':'EOP'},
+    {'id':'senate', 'label':'United States Senate', 'emoji':'🏛️', 'role':'Senate Reviewer', 'rank':'Legislative'},
+    {'id':'omb', 'label':'Office of Management and Budget', 'emoji':'💼', 'role':'OMB Director', 'rank':'EOP'},
+    {'id':'treasury', 'label':'Department of the Treasury', 'emoji':'🏦', 'role':'Secretary of the Treasury', 'rank':'Cabinet'},
+    {'id':'state_dept', 'label':'Department of State', 'emoji':'🌐', 'role':'Secretary of State', 'rank':'Cabinet'},
+    {'id':'dod', 'label':'Department of Defense', 'emoji':'🛡️', 'role':'Secretary of Defense', 'rank':'Cabinet'},
+    {'id':'doj', 'label':'Department of Justice', 'emoji':'⚖️', 'role':'Attorney General', 'rank':'Cabinet'},
     {'id':'commerce', 'label':'Department of Commerce', 'emoji':'🔧', 'role':'Secretary of Commerce', 'rank':'Cabinet'},
-    {'id':'opm', 'label':'Office of Personnel Management', 'emoji':'👔', 'role':'Director of OPM', 'rank':'Agency'},
-    {'id':'press_sec', 'label':'Press Office', 'emoji':'📰', 'role':'Press Secretary', 'rank':'EOP'},
+    {'id':'supreme_court', 'label':'Supreme Court', 'emoji':'🧑‍⚖️', 'role':'Chief Justice', 'rank':'Judicial'},
 ]
 
 
@@ -875,23 +915,35 @@ def wake_agent(agent_id, message=''):
 
 # 状态 → agent_id 映射
 _STATE_AGENT_MAP = {
-    'Taizi': 'chief_of_staff',
-    'Zhongshu': 'nsc',
-    'Menxia': 'wh_counsel',
-    'Omb': 'omb',
-    'Assigned': 'cabinet_sec',
-    'Doing': None,         # Cabinet Departments，需从 org 推断
-    'Review': 'cabinet_sec',
-    'Next': None,          # Queued，从 org 推断
-    'Pending': 'nsc', # Pending，默认National Security Council
+    'pending': 'chief_of_staff',
+    'triage': 'chief_of_staff',
+    'planning': 'nsc',
+    'under_review': 'senate',
+    'filibustered': 'nsc',
+    'dispatched': 'omb',
+    'in_progress': None,   # 从 org 推断
+    'pending_review': 'omb',
+    'completed': 'chief_of_staff',
+    'blocked': 'supreme_court',
 }
 _ORG_AGENT_MAP = {
-    'Department of State': 'state', 'Department of the Treasury': 'treasury', 'Department of Defense': 'defense',
-    'Department of Justice': 'justice', 'Department of Commerce': 'commerce', 'Office of Personnel Management': 'opm',
-    'National Security Council': 'nsc', 'White House Counsel': 'wh_counsel', 'Office of Management and Budget': 'omb', 'Cabinet Secretariat': 'cabinet_sec',
+    'Chief of Staff': 'chief_of_staff',
+    'Chief of Staff Office': 'chief_of_staff',
+    'NSC': 'nsc',
+    'National Security Council': 'nsc',
+    'Senate': 'senate',
+    'United States Senate': 'senate',
+    'OMB': 'omb',
+    'Office of Management and Budget': 'omb',
+    'Supreme Court': 'supreme_court',
+    'Department of State': 'state_dept',
+    'Department of the Treasury': 'treasury',
+    'Department of Defense': 'dod',
+    'Department of Justice': 'doj',
+    'Department of Commerce': 'commerce',
 }
 
-_TERMINAL_STATES = {'Done', 'Cancelled'}
+_TERMINAL_STATES = {'completed', 'Cancelled'}
 
 
 def _parse_iso(ts):
@@ -1002,7 +1054,7 @@ def handle_scheduler_retry(task_id, reason=''):
     if not task:
         return {'ok': False, 'error': f'任务 {task_id} 不存在'}
     state = task.get('state', '')
-    if state in _TERMINAL_STATES or state == 'Blocked':
+    if state in _TERMINAL_STATES or state == 'blocked':
         return {'ok': False, 'error': f'任务 {task_id} 当前状态 {state} 不支持重试'}
 
     sched = _ensure_scheduler(task)
@@ -1024,13 +1076,13 @@ def handle_scheduler_escalate(task_id, reason=''):
         return {'ok': False, 'error': f'任务 {task_id} 不存在'}
     state = task.get('state', '')
     if state in _TERMINAL_STATES:
-        return {'ok': False, 'error': f'任务 {task_id} 已结束，None需升级'}
+        return {'ok': False, 'error': f'任务 {task_id} 已结束，无需升级'}
 
     sched = _ensure_scheduler(task)
     current_level = int(sched.get('escalationLevel') or 0)
     next_level = min(current_level + 1, 2)
-    target = 'wh_counsel' if next_level == 1 else 'cabinet_sec'
-    target_label = 'White House Counsel' if next_level == 1 else 'Cabinet Secretariat'
+    target = 'senate' if next_level == 1 else 'supreme_court'
+    target_label = 'United States Senate' if next_level == 1 else 'Supreme Court'
 
     sched['escalationLevel'] = next_level
     sched['lastEscalatedAt'] = now_iso()
@@ -1096,7 +1148,7 @@ def handle_scheduler_scan(threshold_sec=180):
         state = task.get('state', '')
         if not task_id or state in _TERMINAL_STATES or task.get('archived'):
             continue
-        if state == 'Blocked':
+        if state == 'blocked':
             continue
 
         sched = _ensure_scheduler(task)
@@ -1128,8 +1180,8 @@ def handle_scheduler_scan(threshold_sec=180):
 
         if level < 2:
             next_level = level + 1
-            target = 'wh_counsel' if next_level == 1 else 'cabinet_sec'
-            target_label = 'White House Counsel' if next_level == 1 else 'Cabinet Secretariat'
+            target = 'senate' if next_level == 1 else 'supreme_court'
+            target_label = 'United States Senate' if next_level == 1 else 'Supreme Court'
             sched['escalationLevel'] = next_level
             sched['lastEscalatedAt'] = now_iso()
             _scheduler_add_flow(task, f'停滞{stalled_sec}秒，升级至{target_label}协调', to=target_label)
@@ -1201,14 +1253,14 @@ def _startup_recover_queued_dispatches():
             continue
         sched = task.get('_scheduler') or {}
         if sched.get('lastDispatchStatus') == 'queued':
-            log.info(f'🔄 启动恢复: {task_id} 状态={state} 上次派发未Done，重新派发')
+            log.info(f'🔄 启动恢复: {task_id} 状态={state} 上次派发未完成，重新派发')
             sched['lastDispatchTrigger'] = 'startup-recovery'
             dispatch_for_state(task_id, task, state, trigger='startup-recovery')
             recovered += 1
     if recovered:
-        log.info(f'✅ 启动恢复Done: 重新派发 {recovered} 个任务')
+        log.info(f'✅ 启动恢复完成: 重新派发 {recovered} 个任务')
     else:
-        log.info(f'✅ 启动恢复: None需恢复')
+        log.info(f'✅ 启动恢复: 无需恢复')
 
 
 def handle_repair_flow_order():
@@ -1234,8 +1286,8 @@ def handle_repair_flow_order():
         if isinstance(remark, str) and remark.startswith('下旨：'):
             first['remark'] = remark
 
-        if task.get('state') == 'Zhongshu' and task.get('org') == 'National Security Council' and len(flow_log) == 1:
-            task['state'] = 'Taizi'
+        if task.get('state') == 'planning' and task.get('org') == 'National Security Council' and len(flow_log) == 1:
+            task['state'] = 'triage'
             task['org'] = 'Chief of Staff Office'
             task['now'] = '等待Chief of Staff Office接旨分拣'
 
@@ -1677,7 +1729,7 @@ def get_task_activity(task_id):
 
     # 当前负责 Agent（兼容旧逻辑）
     agent_id = _STATE_AGENT_MAP.get(state)
-    if agent_id is None and state in ('Doing', 'Next'):
+    if agent_id is None and state == 'in_progress':
         agent_id = _ORG_AGENT_MAP.get(org)
 
     # ── 构建活动条目列表（flow_log + progress_log）──
@@ -1762,7 +1814,7 @@ def get_task_activity(task_id):
                 activity.append(todos_entry)
                 prev_todos_snapshot = p_todos
 
-        # 仅当None法通过状态确定 Agent 时，才回退到最后一次上报的 Agent
+        # 仅当无法通过状态确定 Agent 时，才回退到最后一次上报的 Agent
         if not agent_id:
             last_pl = progress_log[-1]
             if last_pl.get('agent'):
@@ -1799,7 +1851,7 @@ def get_task_activity(task_id):
     try:
         session_entries = []
         # 活跃任务：尝试按 task_id 精确匹配
-        if state not in ('Done', 'Cancelled'):
+        if state not in _TERMINAL_STATES:
             if agent_id:
                 entries = get_agent_activity(agent_id, limit=30, task_id=task_id)
                 session_entries.extend(entries)
@@ -1840,7 +1892,7 @@ def get_task_activity(task_id):
     if flow_log:
         try:
             first_at = datetime.datetime.fromisoformat(flow_log[0].get('at', '').replace('Z', '+00:00'))
-            if state in ('Done', 'Cancelled') and len(flow_log) >= 2:
+            if state in _TERMINAL_STATES and len(flow_log) >= 2:
                 last_at = datetime.datetime.fromisoformat(flow_log[-1].get('at', '').replace('Z', '+00:00'))
             else:
                 last_at = datetime.datetime.now(datetime.timezone.utc)
@@ -1884,26 +1936,33 @@ def get_task_activity(task_id):
 
 # 状态推进顺序（手动推进用）
 _STATE_FLOW = {
-    'Pending':  ('Taizi', 'President', 'Chief of Staff Office', 'PendingDirective转交Chief of Staff Office分拣'),
-    'Taizi':    ('Zhongshu', 'Chief of Staff Office', 'National Security Council', 'Chief of Staff Office分拣完毕，转National Security Council起草'),
-    'Zhongshu': ('Menxia', 'National Security Council', 'White House Counsel', 'National Security Council方案提交White House Counsel审议'),
-    'Menxia':   ('Omb', 'White House Counsel', 'Office of Management and Budget', '法律审议通过，转 OMB 二次审议'),
-    'Omb':      ('Assigned', 'Office of Management and Budget', 'Cabinet Secretariat', 'OMB 审议通过，转Cabinet Secretariat派发'),
-    'Assigned': ('Doing', 'Cabinet Secretariat', 'Cabinet Departments', 'Cabinet Secretariat开始派发执行'),
-    'Next':     ('Doing', 'Cabinet Secretariat', 'Cabinet Departments', 'Queued任务开始执行'),
-    'Doing':    ('Review', 'Cabinet Departments', 'Cabinet Secretariat', '各部Done，进入汇总'),
-    'Review':   ('Done', 'Cabinet Secretariat', 'Chief of Staff Office', '全流程Done，回奏Chief of Staff Office转报President'),
+    'pending': ('triage', 'President', 'Chief of Staff Office', 'Presidential Directive 进入 Chief of Staff 分拣'),
+    'triage': ('planning', 'Chief of Staff Office', 'National Security Council', 'Chief of Staff 分拣完成，转 NSC 规划'),
+    'planning': ('under_review', 'National Security Council', 'United States Senate', 'NSC 方案提交 Senate 审议'),
+    'under_review': ('dispatched', 'United States Senate', 'Office of Management and Budget', 'Senate 审议通过，转 OMB 派发'),
+    'dispatched': ('in_progress', 'Office of Management and Budget', 'Cabinet Departments', 'OMB 开始向执行部门派发'),
+    'in_progress': ('pending_review', 'Cabinet Departments', 'Office of Management and Budget', '执行完成，进入 OMB 汇总审议'),
+    'pending_review': ('completed', 'Office of Management and Budget', 'President', '全流程完成，提交总统简报'),
 }
 _STATE_LABELS = {
-    'Pending': 'Pending', 'Taizi': 'Chief of Staff Office', 'Zhongshu': 'National Security Council', 'Menxia': 'White House Counsel',
-    'Omb': 'Office of Management and Budget', 'Assigned': 'Cabinet Secretariat', 'Next': 'Queued', 'Doing': 'In Progress', 'Review': '审查', 'Done': 'Done',
+    'pending': 'Pending',
+    'triage': 'Chief of Staff Triage',
+    'planning': 'NSC Planning',
+    'under_review': 'Senate Review',
+    'filibustered': 'Filibustered',
+    'dispatched': 'OMB Dispatch',
+    'in_progress': 'In Progress',
+    'pending_review': 'OMB Consolidation',
+    'completed': 'Completed',
+    'blocked': 'Supreme Court',
+    'Cancelled': 'Cancelled',
 }
 
 
 def dispatch_for_state(task_id, task, new_state, trigger='state-transition'):
     """推进/审批后自动派发对应 Agent（后台异步，不Blocked响应）。"""
     agent_id = _STATE_AGENT_MAP.get(new_state)
-    if agent_id is None and new_state in ('Doing', 'Next'):
+    if agent_id is None and new_state == 'in_progress':
         org = task.get('org', '')
         agent_id = _ORG_AGENT_MAP.get(org)
     if not agent_id:
@@ -1937,29 +1996,28 @@ def dispatch_for_state(task_id, task, new_state, trigger='state-transition'):
             f'任务ID: {task_id}\n'
             f'Directive: {title}\n'
             f'⚠️ 看板已有此任务记录，请勿重复创建。直接用 kanban_update.py state 更新状态。\n'
-            f'请立即起草执行方案，走完完整流程（NSC 规划→法律审议→OMB 审议→内阁派发→部门执行）。'
+            f'请立即起草执行方案，走完完整流程（Chief of Staff→NSC→Senate→OMB→Departments）。'
         ),
-        'wh_counsel': (
-            f'📋 National Security Council方案提交审议\n'
+        'senate': (
+            f'📋 National Security Council方案提交 Senate 审议\n'
             f'任务ID: {task_id}\n'
             f'Directive: {title}\n'
             f'⚠️ 看板已有此任务，请勿重复创建。\n'
-            f'请Done法律与合规审议，给出通过或驳回意见。'
+            f'请按 filibuster 机制给出通过或封否意见。'
         ),
         'omb': (
-            f'📊 White House Counsel 已通过，请进行 OMB 二次审议\n'
+            f'📊 Senate 已通过，请进行 OMB 审议与派发\n'
             f'任务ID: {task_id}\n'
             f'Directive: {title}\n'
             f'⚠️ 看板已有此任务，请勿重复创建。\n'
-            f'请重点审查预算、资源、执行窗口与风险可控性。'
+            f'请审查预算与资源，并向各执行部门派发任务。'
         ),
-        'cabinet_sec': (
-            f'📮 OMB 审议已通过，请派发执行\n'
+        'supreme_court': (
+            f'⚖️ 系统触发争议仲裁\n'
             f'任务ID: {task_id}\n'
             f'Directive: {title}\n'
-            f'{"建议派发部门: " + target_dept if target_dept else ""}\n'
             f'⚠️ 看板已有此任务，请勿重复创建。\n'
-            f'请分析方案并派发给Cabinet Departments执行。'
+            f'请对冲突事项做出最终裁决。'
         ),
     }
     msg = _msgs.get(agent_id, (
@@ -2053,7 +2111,7 @@ def handle_advance_state(task_id, comment=''):
         return {'ok': False, 'error': f'任务 {task_id} 不存在'}
     cur = task.get('state', '')
     if cur not in _STATE_FLOW:
-        return {'ok': False, 'error': f'任务 {task_id} 状态为 {cur}，None法推进'}
+        return {'ok': False, 'error': f'任务 {task_id} 状态为 {cur}，无法推进'}
     _ensure_scheduler(task)
     _scheduler_snapshot(task, f'advance-before-{cur}')
     next_state, from_dept, to_dept, default_remark = _STATE_FLOW[cur]
@@ -2071,13 +2129,13 @@ def handle_advance_state(task_id, comment=''):
     task['updatedAt'] = now_iso()
     save_tasks(tasks)
 
-    # 🚀 推进后自动派发对应 Agent（Done 状态None需派发）
-    if next_state != 'Done':
+    # 🚀 推进后自动派发对应 Agent（终态不派发）
+    if next_state not in _TERMINAL_STATES:
         dispatch_for_state(task_id, task, next_state)
 
     from_label = _STATE_LABELS.get(cur, cur)
     to_label = _STATE_LABELS.get(next_state, next_state)
-    dispatched = ' (已自动派发 Agent)' if next_state != 'Done' else ''
+    dispatched = ' (已自动派发 Agent)' if next_state not in _TERMINAL_STATES else ''
     return {'ok': True, 'message': f'{task_id} {from_label} → {to_label}{dispatched}'}
 
 
@@ -2179,7 +2237,7 @@ class Handler(BaseHTTPRequestHandler):
             # 标准化日期格式为 YYYYMMDD（兼容 YYYY-MM-DD 输入）
             date_clean = date.replace('-', '')
             if not date_clean.isdigit() or len(date_clean) != 8:
-                self.send_json({'ok': False, 'error': f'日期格式None效: {date}，请使用 YYYYMMDD'}, 400)
+                self.send_json({'ok': False, 'error': f'日期格式无效: {date}，请使用 YYYYMMDD'}, 400)
                 return
             self.send_json(read_json(DATA / f'morning_brief_{date_clean}.json', {}))
         elif p == '/api/remote-skills-list':
@@ -2254,7 +2312,7 @@ class Handler(BaseHTTPRequestHandler):
             # 飞书 Webhook 校验
             webhook = body.get('feishu_webhook', '').strip()
             if webhook and not validate_url(webhook, allowed_schemes=('https',), allowed_domains=('open.feishu.cn', 'open.larksuite.com')):
-                self.send_json({'ok': False, 'error': '飞书 Webhook URL None效，仅支持 https://open.feishu.cn 或 open.larksuite.com 域名'}, 400)
+                self.send_json({'ok': False, 'error': '飞书 Webhook URL 无效，仅支持 https://open.feishu.cn 或 open.larksuite.com 域名'}, 400)
                 return
             cfg_path = DATA / 'morning_brief_config.json'
             cfg_path.write_text(json.dumps(body, ensure_ascii=False, indent=2))
@@ -2487,7 +2545,7 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='U.S. Cabinet Branch看板服务器')
+    parser = argparse.ArgumentParser(description='Executive Order 看板服务器')
     parser.add_argument('--port', type=int, default=7891)
     parser.add_argument('--host', default='127.0.0.1')
     parser.add_argument('--cors', default=None, help='Allowed CORS origin (default: reflect request Origin header)')
@@ -2497,7 +2555,7 @@ def main():
     ALLOWED_ORIGIN = args.cors
 
     server = HTTPServer((args.host, args.port), Handler)
-    log.info(f'U.S. Cabinet Branch看板启动 → http://{args.host}:{args.port}')
+    log.info(f'Executive Order 看板启动 → http://{args.host}:{args.port}')
     print(f'   按 Ctrl+C 停止')
 
     # 启动恢复：重新派发上次被 kill 中断的 queued 任务

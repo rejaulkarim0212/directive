@@ -9,6 +9,26 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(name)s] %(message
 BASE = pathlib.Path(__file__).parent.parent
 DATA = BASE / 'data'
 
+LEGACY_STATE_MAP = {
+    'Pending': 'pending',
+    'Taizi': 'triage',
+    'Zhongshu': 'planning',
+    'Menxia': 'under_review',
+    'Omb': 'dispatched',
+    'Assigned': 'dispatched',
+    'Doing': 'in_progress',
+    'Review': 'pending_review',
+    'Next': 'in_progress',
+    'Done': 'completed',
+    'Blocked': 'blocked',
+}
+
+
+def normalize_state(state):
+    if isinstance(state, str):
+        return LEGACY_STATE_MAP.get(state, state)
+    return state
+
 
 def output_meta(path):
     p = pathlib.Path(path)
@@ -37,11 +57,12 @@ def main():
 
     now_ts = datetime.datetime.now(datetime.timezone.utc)
     for t in tasks:
+        t['state'] = normalize_state(t.get('state', ''))
         t['org'] = t.get('org') or org_map.get(t.get('official', ''), '')
         t['outputMeta'] = output_meta(t.get('output', ''))
 
-        # 心跳时效检测：对 Doing/Assigned 状态的任务标注活跃度
-        if t.get('state') in ('Doing', 'Assigned', 'Review'):
+        # 心跳时效检测：对执行/汇总阶段任务标注活跃度
+        if t.get('state') in ('dispatched', 'in_progress', 'pending_review'):
             updated_raw = t.get('updatedAt') or t.get('sourceMeta', {}).get('updatedAt')
             age_sec = None
             if updated_raw:
@@ -66,7 +87,7 @@ def main():
 
     today_str = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d')
     def _is_today_done(t):
-        if t.get('state') != 'Done':
+        if t.get('state') != 'completed':
             return False
         ua = t.get('updatedAt', '')
         if isinstance(ua, str) and ua[:10] == today_str:
@@ -77,13 +98,13 @@ def main():
             return True
         return False
     today_done = sum(1 for t in tasks if _is_today_done(t))
-    total_done = sum(1 for t in tasks if t.get('state') == 'Done')
-    in_progress = sum(1 for t in tasks if t.get('state') in ['Doing', 'Review', 'Next', 'Blocked'])
-    blocked = sum(1 for t in tasks if t.get('state') == 'Blocked')
+    total_done = sum(1 for t in tasks if t.get('state') == 'completed')
+    in_progress = sum(1 for t in tasks if t.get('state') in ['triage', 'planning', 'under_review', 'dispatched', 'in_progress', 'pending_review'])
+    blocked = sum(1 for t in tasks if t.get('state') == 'blocked')
 
     history = []
     for t in tasks:
-        if t.get('state') == 'Done':
+        if t.get('state') == 'completed':
             lm = t.get('outputMeta', {}).get('lastModified')
             history.append({
                 'at': lm or '未知',
