@@ -4,6 +4,14 @@
 
 ---
 
+## 最近更新 ✅
+
+- [x] README 界面截图更新 - 添加 entry.png 和 main.png 预览图
+- [x] 移除 Demo 视频和 GIF，改为静态截图展示
+- [x] 同步更新中英文 README
+
+---
+
 ## Phase 1 — 核心架构 ✅
 
 - [x] 10-agent 架构 (Chief of Staff + NSC + Senate + OMB + Supreme Court + 5 Departments)

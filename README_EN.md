@@ -64,6 +64,22 @@ Supreme Court (Arbitration) ←─── Dispute Appeal ←─── OMB (Dispat
 
 ---
 
+## 📸 Screenshots
+
+<p align="center">
+  <img src="asset/entry.png" alt="Entry Page" width="80%">
+  <br>
+  <sub>🚪 Entry Page - Presidential Inauguration</sub>
+</p>
+
+<p align="center">
+  <img src="asset/main.png" alt="Main Dashboard" width="80%">
+  <br>
+  <sub>🏛️ Situation Room Dashboard - Real-time Agency Monitoring</sub>
+</p>
+
+---
+
 ## 🏛️ Ten-Agent Architecture
 
 ### Flow Path
